@@ -4,6 +4,7 @@ import argparse
 import os
 import scipy.misc
 import numpy as np
+import copy
 
 from model import pix2pix
 import tensorflow as tf
@@ -57,14 +58,46 @@ def main(_):
         model.load_model(args)
         graph = tf.get_default_graph()
         input_graph_def = graph.as_graph_def()
-        output_graph_def = graph_util.convert_variables_to_constants(
+
+        # fix batch norm nodes
+        for node in input_graph_def.node:
+            if node.op == 'RefSwitch':
+                node.op = 'Switch'
+                for index in xrange(len(node.input)):
+                    if 'moving_' in node.input[index]:
+                        node.input[index] = node.input[index] + '/read'
+            elif node.op == 'AssignSub':
+                node.op = 'Sub'
+                if 'use_locking' in node.attr:
+                    del node.attr['use_locking']
+
+        # freeze!
+        freeze_graph_def = graph_util.convert_variables_to_constants(
             sess,
             input_graph_def,
             ['generator/Tanh']
         )
 
+        #copy input-related sub graph_util
+        input_node_names_list = ['real_A_and_B_images']
+        input_replaced_graph_def = tf.GraphDef()
+        for node in freeze_graph_def.node:
+            if node.name in input_node_names_list:
+                placeholder_node = tf.NodeDef()
+                placeholder_node.op = 'Placeholder'
+                placeholder_node.name = node.name
+                placeholder_node.attr['dtype'].CopyFrom(tf.AttrValue(type=tf.float32.as_datatype_enum))
+                input_replaced_graph_def.node.extend([placeholder_node])
+                print(node.name, 'is replaced with placeholder')
+            else:
+                input_replaced_graph_def.node.extend([copy.deepcopy(node)])
+
+        # extract subgraph
+        output_sub_graph_def = graph_util.extract_sub_graph(input_replaced_graph_def,
+            ['generator/Tanh'])
+
         with tf.gfile.GFile('export_model.pb', 'wb') as f:
-            f.write(input_graph_def.SerializeToString())
+            f.write(output_sub_graph_def.SerializeToString())
 
 
 if __name__ == '__main__':

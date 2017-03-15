@@ -1,1 +1,1 @@
-pm2 start serve.py --name "serve_tf" --interpreter python3
+pm2 start pbserve.py --name "serve_pb" --interpreter python3

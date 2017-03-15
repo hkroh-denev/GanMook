@@ -1,6 +1,11 @@
-## SETUP Web.py
+## SETUP inception module for training
 
-pip install web.py
+cd imagenet
+download.sh
+
+
+## SETUP Web.py for serving
+
 git clone git://github.com/webpy/webpy.git
 cd webpy
-python setup.py install
+sudo python setup.py install

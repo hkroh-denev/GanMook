@@ -133,7 +133,7 @@ class pix2pix(object):
             for dim in shape:
                 v_param *= dim.value
             total_params += v_param
-            print(v.name, ': ', v_param)
+            #print(v.name, ': ', v_param)
         print('total trainable params: ', total_params)
 
         self.d_vars = [var for var in t_vars if 'd_' in var.name]
