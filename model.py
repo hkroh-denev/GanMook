@@ -15,7 +15,8 @@ class pix2pix(object):
     def __init__(self, sess, image_size=256,
                  batch_size=1, sample_size=1, output_size=256,
                  gf_dim=64, df_dim=64, L1_lambda=100,
-                 input_c_dim=3, output_c_dim=3, dataset_name='facades',
+                 G2_lambda = 100,
+                 input_c_dim=1, output_c_dim=1, dataset_name='facades',
                  checkpoint_dir=None, sample_dir=None, direction='AtoB'):
         """
 
@@ -43,6 +44,7 @@ class pix2pix(object):
         self.output_c_dim = output_c_dim
 
         self.L1_lambda = L1_lambda
+        self.G2_lambda = G2_lambda
 
         # batch normalization : deals with poor initialization helps gradient flow
         self.d_bn1 = batch_norm(name='d_bn1')
@@ -113,7 +115,7 @@ class pix2pix(object):
         gen_img = tf.image.grayscale_to_rgb(gen_img)
         self.pool_3, = self.create_inception_graph(gen_img)
         self.conf, = self.create_classifier([tf.squeeze(self.pool_3)])
-        self.g_loss_clf = 100.0 * tf.reduce_mean(self.conf[:, 1])
+        self.g2_loss = self.G2_lambda * tf.reduce_mean(self.conf[:, 1])
 
         self.d_loss_real_sum = tf.summary.scalar("d_loss_real", self.d_loss_real)
         self.d_loss_fake_sum = tf.summary.scalar("d_loss_fake", self.d_loss_fake)
@@ -122,7 +124,7 @@ class pix2pix(object):
 
         self.g_loss_sum = tf.summary.scalar("g_loss", self.g_loss)
         self.d_loss_sum = tf.summary.scalar("d_loss", self.d_loss)
-        self.g_loss_clf_sum = tf.summary.scalar("g_loss_clf", self.g_loss_clf)
+        self.g2_loss_sum = tf.summary.scalar("g2_loss", self.g2_loss)
 
         t_vars = tf.trainable_variables()
 
@@ -167,16 +169,15 @@ class pix2pix(object):
         g_optim = tf.train.AdamOptimizer(args.lr, beta1=args.beta1) \
                           .minimize(self.g_loss, var_list=self.g_vars)
 
-        g_optim_clf = tf.train.AdamOptimizer(args.lr, beta1=args.beta1) \
-                            .minimize(self.g_loss_clf, var_list=self.g_vars)
+        g2_optim = tf.train.AdamOptimizer(args.lr, beta1=args.beta1) \
+                            .minimize(self.g2_loss, var_list=self.g_vars)
 
         tf.global_variables_initializer().run()
 
         self.g_sum = tf.summary.merge([self.d__sum,
-            #self.fake_B_sum,
             self.d_loss_fake_sum, self.g_loss_sum])
         self.d_sum = tf.summary.merge([self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
-        self.g_clf_sum = tf.summary.merge([self.g_loss_clf_sum])
+        self.g2_sum = tf.summary.merge([self.g2_loss_sum])
         self.writer = tf.summary.FileWriter("./logs", self.sess.graph)
 
         counter = 1
@@ -220,20 +221,20 @@ class pix2pix(object):
                         time.time() - start_time, errD_fake+errD_real, errG))
 
                 # run classifier with G network update
-                if epoch >= 100:
+                if epoch >= 49:
                     alt_batch_size = self.batch_size
                     alt_idx = np.mod(idx, alt_batch_idxs)
                     alt_batch_files = alt_data[alt_idx*alt_batch_size:(alt_idx+1)*alt_batch_size]
                     alt_batch = [load_data(alt_batch_file) for alt_batch_file in alt_batch_files]
                     alt_batch_images = np.array(alt_batch).astype(np.float32)
 
-                    _, summary_str, errG_clf = self.sess.run([g_optim_clf, self.g_clf_sum, self.g_loss_clf],
+                    _, summary_str, errG2 = self.sess.run([g2_optim, self.g2_sum, self.g2_loss],
                                                     feed_dict={self.real_data: alt_batch_images})
                     self.writer.add_summary(summary_str, counter)
 
-                    print("Epoch: [%2d] Alt: [%3d/%3d] time: %4.4f, g_clf_loss: %.8f" \
+                    print("Epoch: [%2d] Alt: [%3d/%3d] time: %4.4f, g2_loss: %.8f" \
                         % (epoch, alt_idx, alt_batch_idxs,
-                            time.time() - start_time, errG_clf))
+                            time.time() - start_time, errG2))
 
                 counter += 1
 

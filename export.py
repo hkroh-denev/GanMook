@@ -19,8 +19,8 @@ parser.add_argument('--load_size', dest='load_size', type=int, default=320, help
 parser.add_argument('--fine_size', dest='fine_size', type=int, default=256, help='then crop to this size')
 parser.add_argument('--ngf', dest='ngf', type=int, default=64, help='# of gen filters in first conv layer')
 parser.add_argument('--ndf', dest='ndf', type=int, default=64, help='# of discri filters in first conv layer')
-parser.add_argument('--input_nc', dest='input_nc', type=int, default=3, help='# of input image channels')
-parser.add_argument('--output_nc', dest='output_nc', type=int, default=3, help='# of output image channels')
+parser.add_argument('--input_nc', dest='input_nc', type=int, default=1, help='# of input image channels')
+parser.add_argument('--output_nc', dest='output_nc', type=int, default=1, help='# of output image channels')
 parser.add_argument('--niter', dest='niter', type=int, default=200, help='# of iter at starting learning rate')
 parser.add_argument('--lr', dest='lr', type=float, default=0.0002, help='initial learning rate for adam')
 parser.add_argument('--beta1', dest='beta1', type=float, default=0.5, help='momentum term of adam')
@@ -53,6 +53,7 @@ def main(_):
         model = pix2pix(sess, image_size=args.fine_size, batch_size=args.batch_size,
                         output_size=args.fine_size, dataset_name=args.dataset_name,
                         checkpoint_dir=args.checkpoint_dir, sample_dir=args.sample_dir,
+                        input_c_dim=args.input_nc, output_c_dim=args.output_nc,
                         direction=args.which_direction)
 
         model.load_model(args)
