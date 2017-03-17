@@ -13,7 +13,7 @@ def main(_):
     if not os.path.exists('./test'):
         os.makedirs('./test')
 
-    with tf.gfile.GFile('model/ganmook_clf_1.pb', 'rb') as f:
+    with tf.gfile.GFile('model/ganmook_clf_2.pb', 'rb') as f:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(f.read())
 
@@ -44,13 +44,14 @@ def test_single_image(web, param):
     sample_image = np.empty((256, 256, 6), dtype=np.float32)
     for i in range(6):
         sample_image [:, :, i] = input_img
-    sample_image = [sample_image]
+    sample_images = [sample_image]
 
     samples = web.sess.run(
         web.generated_result,
-        feed_dict={'pix2pix/real_A_and_B_images:0': sample_image}
+        feed_dict={'pix2pix/real_A_and_B_images:0': sample_images}
     )
-    sample = scipy.misc.imresize(samples[0], [h, w])
+    sample = np.squeeze(samples[0])
+    sample = scipy.misc.imresize(sample, [h, w])
     scipy.misc.imsave('./test/output_{}.jpg'.format(param['id']), sample)
 
 class index:
