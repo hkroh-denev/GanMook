@@ -1,0 +1,5 @@
+{
+  "model_file": "model/ganmook_nopatch_clf.pb",
+  "port": 8081,
+  "input_size": 256
+}
