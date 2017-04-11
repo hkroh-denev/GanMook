@@ -54,19 +54,32 @@ def main(_):
         else:
             webapp.run(port=8081)
 
-def image_overlay_avg(master, x, y, subimg):
-    for i in range(3, 250):
-        for j in range(3, 250):
-            if (master[y + j , x + i] == -1.1):
+def image_overlay_linear(master, x, y, subimg, input_size):
+    for i in range(3, input_size-5):
+        for j in range(3, input_size-5):
+            if (master[y + j, x + i] == -1.1):
                 master[y + j, x + i] = subimg[j, i]
             else:
-                master[y + j, x + i] = (master[y + j, x + i] + subimg[j, i]) / 2.0
+                if i < 64 and j < 64:
+                    r = min(i, j)
+                    master[y + j, x + i] = ((64-r)/64.0*master[y + j, x + i] + r/64.0*subimg[j, i])
+                elif i < 64:
+                    master[y + j, x + i] = ((64-i)/64.0*master[y + j, x + i] + i/64.0*subimg[j, i])
+                elif j < 64:
+                    master[y + j, x + i] = ((64-j)/64.0*master[y + j, x + i] + j/64.0*subimg[j, i])
+                else:
+                    master[y + j, x + i] = subimg[j, i]
 
 def test_single_image_full(web, param):
+    if config:
+        input_size = config["input_size"]
+    else:
+        input_size = 256
+
     input_img = scipy.misc.imread('./test/input_{}.jpg'.format(param['id']), flatten = True).astype(np.float)
     h, w = input_img.shape
-    pad_h = h+ 256 #(h+255) // 256 * 256
-    pad_w = w + 256 #(w+255) // 256 * 256
+    pad_h = h+ input_size #(h+255) // 256 * 256
+    pad_w = w + input_size #(w+255) // 256 * 256
     pad_img = np.pad(input_img[:h, :w], pad_width=((0, pad_h-h), (0, pad_w-w)), mode='constant')
     x = y = n = 0
     output_img = np.empty((pad_h, pad_w), np.float)
@@ -74,22 +87,22 @@ def test_single_image_full(web, param):
     while x < w:
         while y < h:
             print('x & y', x, y)
-            sub_img = pad_img[y:y+256, x:x+256]
+            sub_img = pad_img[y:y+input_size, x:x+input_size]
             sub_img = sub_img / 127.5 - 1.
             if (np.mean(sub_img) < - 0.999):
                 generated = np.ones_like(sub_img)
             else:
-                sample_image = np.empty((256, 256, 6), dtype=np.float32)
+                sample_image = np.empty((input_size, input_size, 6), dtype=np.float32)
                 for c in range(6):
                     sample_image[:, :, c] = sub_img
                 sample_images = [sample_image]
                 generated = web.sess.run(web.generated_result,
                     feed_dict={'pix2pix/real_A_and_B_images:0': sample_images}
                 )
-            image_overlay_avg(output_img, x, y, np.squeeze(generated))
+            image_overlay_linear(output_img, x, y, np.squeeze(generated), input_size)
             n = n + 1
-            y = y + 63
-        x = x + 63
+            y = y + input_size - 64
+        x = x + input_size - 64
         y = 0
     output_crop_img = output_img[:h, :w]
     scipy.misc.imsave('./test/output_{}.jpg'.format(param['id']), output_crop_img)
@@ -127,8 +140,13 @@ class index:
         str = web.data().decode()
         print(str)
         data = json.loads(str)
-        test_single_image(web, data)
-        #test_single_image_full(web, data)
+        if config:
+            if config["max_resolution"] > 512:
+                test_single_image_full(web, data)
+            else:
+                test_single_image(web, data)
+        else:
+            test_single_image(web, data)
         return '200 OK'
 
 class serve(web.application):

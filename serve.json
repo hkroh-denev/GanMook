@@ -1,5 +1,6 @@
 {
-  "model_file": "model/ganmook_nopatch_clf.pb",
+  "model_file": "model/ganmook_512_pure.pb",
   "port": 8081,
-  "input_size": 256
+  "input_size": 512,
+  "max_resolution": 512
 }
